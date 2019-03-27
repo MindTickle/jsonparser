@@ -1168,7 +1168,7 @@ func FlattenObjectEach(data []byte, path []byte, callback func(path []byte, valu
 		}
 
 		if valueType == Object {
-			if err := NestedObjectEach(value, newPath, callback); err != nil {
+			if err := FlattenObjectEach(value, newPath, callback); err != nil {
 				return err
 			}
 		} else {

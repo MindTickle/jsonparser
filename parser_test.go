@@ -1433,6 +1433,10 @@ func TestObjectEach(t *testing.T) {
 var flattenObjectEachTests = []ObjectEachTest{
 	{
 		desc:    "empty object",
+		json:    `{ "bool": true, "bool1": true }`,
+		entries: []keyValueEntry{},
+	}, {
+		desc:    "empty object",
 		json:    `{}`,
 		entries: []keyValueEntry{},
 	},
