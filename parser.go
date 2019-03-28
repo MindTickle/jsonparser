@@ -285,7 +285,7 @@ func searchKeys(data []byte, keys ...string) int {
 			if !lastMatched {
 				end := blockEnd(data[i:], '{', '}')
 				i += end - 1
-			} else{
+			} else {
 				level++
 			}
 		case '}':
@@ -1059,6 +1059,125 @@ func ObjectEach(data []byte, callback func(key []byte, value []byte, dataType Va
 			offset += off
 		}
 
+		// Step 4: skip over the next comma to the following token, or stop if we hit the ending brace
+		if off := nextToken(data[offset:]); off == -1 {
+			return MalformedArrayError
+		} else {
+			offset += off
+			switch data[offset] {
+			case '}':
+				return nil // Stop if we hit the close brace
+			case ',':
+				offset++ // Ignore the comma
+			default:
+				return MalformedObjectError
+			}
+		}
+
+		// Skip to the next token after the comma
+		if off := nextToken(data[offset:]); off == -1 {
+			return MalformedArrayError
+		} else {
+			offset += off
+		}
+	}
+
+	return MalformedObjectError // we shouldn't get here; it's expected that we will return via finding the ending brace
+}
+
+func FlattenObjectEach(data []byte, path []byte, callback func(path []byte, value []byte, dataType ValueType, offset int) error, keys ...string) (err error) {
+	var stackbuf [unescapeStackBufSize]byte // stack-allocated array for allocation-free unescaping of small strings
+	offset := 0
+
+	// Descend to the desired key, if requested
+	if len(keys) > 0 {
+		if off := searchKeys(data, keys...); off == -1 {
+			return KeyPathNotFoundError
+		} else {
+			offset = off
+		}
+	}
+
+	// Validate and skip past opening brace
+	if off := nextToken(data[offset:]); off == -1 {
+		return MalformedObjectError
+	} else if offset += off; data[offset] != '{' {
+		return MalformedObjectError
+	} else {
+		offset++
+	}
+
+	// Skip to the first token inside the object, or stop if we find the ending brace
+	if off := nextToken(data[offset:]); off == -1 {
+		return MalformedJsonError
+	} else if offset += off; data[offset] == '}' {
+		return nil
+	}
+
+	// Loop pre-condition: data[offset] points to what should be either the next entry's key, or the closing brace (if it's anything else, the JSON is malformed)
+	for offset < len(data) {
+		// Step 1: find the next key
+		var key []byte
+
+		// Check what the the next token is: start of string, end of object, or something else (error)
+		switch data[offset] {
+		case '"':
+			offset++ // accept as string and skip opening quote
+		case '}':
+			return nil // we found the end of the object; stop and return success
+		default:
+			return MalformedObjectError
+		}
+
+		// Find the end of the key string
+		var keyEscaped bool
+		if off, esc := stringEnd(data[offset:]); off == -1 {
+			return MalformedJsonError
+		} else {
+			key, keyEscaped = data[offset:offset+off-1], esc
+			offset += off
+		}
+
+		// Unescape the string if needed
+		if keyEscaped {
+			if keyUnescaped, err := Unescape(key, stackbuf[:]); err != nil {
+				return MalformedStringEscapeError
+			} else {
+				key = keyUnescaped
+			}
+		}
+
+		// Step 2: skip the colon
+		if off := nextToken(data[offset:]); off == -1 {
+			return MalformedJsonError
+		} else if offset += off; data[offset] != ':' {
+			return MalformedJsonError
+		} else {
+			offset++
+		}
+		var newPath []byte
+		if len(path) != 0 {
+			newPath = append(path, "."...)
+		}
+		newPath = append(newPath, key...)
+
+		value, valueType, off, err := Get(data[offset:])
+		// Step 3: find the associated value, then invoke the callback
+		if err != nil {
+			return err
+		}
+
+		if valueType == Object {
+			if err := FlattenObjectEach(value, newPath, callback); err != nil {
+				return err
+			}
+		} else {
+			if err := callback(newPath, value, valueType, offset+off); err != nil { // Invoke the callback here!
+				return err
+			}
+		}
+
+		offset += off
 		// Step 4: skip over the next comma to the following token, or stop if we hit the ending brace
 		if off := nextToken(data[offset:]); off == -1 {
 			return MalformedArrayError

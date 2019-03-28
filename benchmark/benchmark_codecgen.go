@@ -2569,7 +2569,7 @@ func (x *LargePayload) CodecEncodeSelf(e *codec1978.Encoder) {
 				}
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey6212)
-				r.EncodeString(codecSelferC_UTF86212, string("Users"))
+				r.EncodeString(codecSelferC_UTF86212, string("Company"))
 				z.EncSendContainerState(codecSelfer_containerMapValue6212)
 				if x.Users == nil {
 					r.EncodeNil()
@@ -2662,7 +2662,7 @@ func (x *LargePayload) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 		yys3 := string(yys3Slc)
 		z.DecSendContainerState(codecSelfer_containerMapValue6212)
 		switch yys3 {
-		case "Users":
+		case "Company":
 			if r.TryDecodeAsNil() {
 				x.Users = nil
 			} else {

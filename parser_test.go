@@ -1430,6 +1430,159 @@ func TestObjectEach(t *testing.T) {
 	}
 }
 
+var flattenObjectEachTests = []ObjectEachTest{
+	{
+		desc:    "empty object",
+		json:    `{ "bool": true, "bool1": true }`,
+		entries: []keyValueEntry{},
+	}, {
+		desc:    "empty object",
+		json:    `{}`,
+		entries: []keyValueEntry{},
+	},
+	{
+		desc: "single key-value object",
+		json: `{"key": "value"}`,
+		entries: []keyValueEntry{
+			{"key", "value", String},
+		},
+	},
+	{
+		desc: "multiple key-value object with many value types",
+		json: `{
+		  "key1": null,
+		  "key2": true,
+		  "key3": 1.23,
+		  "key4": "string value",
+		  "key5": [1,2,3],
+		  "key6": {"a": {"a": "b"}, "d": 10}
+		}`,
+		entries: []keyValueEntry{
+			{"key1", "null", Null},
+			{"key2", "true", Boolean},
+			{"key3", "1.23", Number},
+			{"key4", "string value", String},
+			{"key5", "[1,2,3]", Array},
+			{"key6.a.a", "b", String},
+			{"key6.d", "10", Number},
+		},
+	},
+	{
+		desc: "escaped key",
+		json: `{"key\"\\\/\b\f\n\r\t\u00B0": "value"}`,
+		entries: []keyValueEntry{
+			{"key\"\\/\b\f\n\r\t\u00B0", "value", String},
+		},
+	},
+	// Error cases
+	{
+		desc:  "no object present",
+		json:  ` \t\n\r`,
+		isErr: true,
+	},
+	{
+		desc:  "unmatched braces 1",
+		json:  `{`,
+		isErr: true,
+	},
+	{
+		desc:  "unmatched braces 2",
+		json:  `}`,
+		isErr: true,
+	},
+	{
+		desc:  "unmatched braces 3",
+		json:  `}{}`,
+		isErr: true,
+	},
+	{
+		desc:  "bad key (number)",
+		json:  `{123: "value"}`,
+		isErr: true,
+	},
+	{
+		desc:  "bad key (unclosed quote)",
+		json:  `{"key: 123}`,
+		isErr: true,
+	},
+	{
+		desc:  "bad value (no value)",
+		json:  `{"key":}`,
+		isErr: true,
+	},
+	{
+		desc:  "bad value (bogus value)",
+		json:  `{"key": notavalue}`,
+		isErr: true,
+	},
+	{
+		desc:  "bad entry (missing colon)",
+		json:  `{"key" "value"}`,
+		isErr: true,
+	},
+	{
+		desc:  "bad entry (no trailing comma)",
+		json:  `{"key": "value" "key2": "value2"}`,
+		isErr: true,
+	},
+	{
+		desc:  "bad entry (two commas)",
+		json:  `{"key": "value",, "key2": "value2"}`,
+		isErr: true,
+	},
+	{
+		desc:  "nested malformed json entry (two commas)",
+		json:  `{"key": {"key1": "value",, "key2": "value2"}}`,
+		isErr: true,
+	},
+}
+
+func TestFlattenObjectEach(t *testing.T) {
+	for _, test := range flattenObjectEachTests {
+		if activeTest != "" && test.desc != activeTest {
+			continue
+		}
+
+		// Execute ObjectEach and capture all of the entries visited, in order
+		var entries []keyValueEntry
+		err := FlattenObjectEach([]byte(test.json), []byte{}, func(path []byte, value []byte, valueType ValueType, off int) error {
+			entries = append(entries, keyValueEntry{
+				key:       string(path),
+				value:     string(value),
+				valueType: valueType,
+			})
+			return nil
+		})
+
+		// Check the correctness of the result
+		isErr := err != nil
+		if test.isErr != isErr {
+			// If the call didn't match the error expectation, fail
+			t.Errorf("FlattenObjectEach test '%s' isErr mismatch: expected %t, obtained %t (err %v)", test.desc, test.isErr, isErr, err)
+		} else if isErr {
+			// Else, if there was an expected error, don't fail and don't check anything further
+		} else if len(test.entries) != len(entries) {
+			t.Errorf("FlattenObjectEach test '%s' mismatch in number of key-value entries: expected %d, obtained %d (entries found: %s)", test.desc, len(test.entries), len(entries), entries)
+		} else {
+			for i, entry := range entries {
+				expectedEntry := test.entries[i]
+				if expectedEntry.key != entry.key {
+					t.Errorf("FlattenObjectEach test '%s' key mismatch at entry %d: expected %s, obtained %s", test.desc, i, expectedEntry.key, entry.key)
+					break
+				} else if expectedEntry.value != entry.value {
+					t.Errorf("FlattenObjectEach test '%s' value mismatch at entry %d: expected %s, obtained %s", test.desc, i, expectedEntry.value, entry.value)
+					break
+				} else if expectedEntry.valueType != entry.valueType {
+					t.Errorf("FlattenObjectEach test '%s' value type mismatch at entry %d: expected %s, obtained %s", test.desc, i, expectedEntry.valueType, entry.valueType)
+					break
+				} else {
+					// Success for this entry
+				}
+			}
+		}
+	}
+}
+
 var testJson = []byte(`{"name": "Name", "order": "Order", "sum": 100, "len": 12, "isPaid": true, "nested": {"a":"test", "b":2, "nested3":{"a":"test3","b":4}, "c": "unknown"}, "nested2": {"a":"test2", "b":3}, "arr": [{"a":"zxc", "b": 1}, {"a":"123", "b":2}], "arrInt": [1,2,3,4], "intPtr": 10}`)
 
 func TestEachKey(t *testing.T) {

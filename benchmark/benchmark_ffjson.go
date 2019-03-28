@@ -1921,7 +1921,7 @@ func (mj *LargePayload) MarshalJSONBuf(buf fflib.EncodingBuffer) error {
 	var obj []byte
 	_ = obj
 	_ = err
-	buf.WriteString(`{"Users":`)
+	buf.WriteString(`{"Company":`)
 	if mj.Users != nil {
 		buf.WriteString(`[`)
 		for i, v := range mj.Users {
@@ -1974,7 +1974,7 @@ const (
 	ffj_t_LargePayload_Topics
 )
 
-var ffj_key_LargePayload_Users = []byte("Users")
+var ffj_key_LargePayload_Users = []byte("Company")
 
 var ffj_key_LargePayload_Topics = []byte("Topics")
 
@@ -2106,7 +2106,7 @@ mainparse:
 
 handle_Users:
 
-	/* handler: uj.Users type=[]*benchmark.DSUser kind=slice quoted=false*/
+	/* handler: uj.Company type=[]*benchmark.DSUser kind=slice quoted=false*/
 
 	{
 
